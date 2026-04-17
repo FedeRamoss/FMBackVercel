@@ -4,9 +4,9 @@ from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 
-from similitud import SimilitudComparatorV3, compute_similarity_v3, ranking_jugadores
-from filtros  import filtrar_por_posicion, filtrar_minutos
-from loader   import limpiar_data
+from .similitud import SimilitudComparatorV3, compute_similarity_v3, ranking_jugadores
+from .filtros  import filtrar_por_posicion, filtrar_minutos
+from .loader   import limpiar_data
 
 app = FastAPI(title="FM Similarity API")
 
