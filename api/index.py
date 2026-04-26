@@ -145,7 +145,9 @@ def calcular_ranking(req: RankingRequest):
     if not req.pool:
         raise HTTPException(status_code=400, detail="El pool está vacío.")
 
-    todas_stats = req.stats_positivas + req.stats_negativas
+    stats_positivas = [s.strip().lower() for s in req.stats_positivas]
+    stats_negativas = [s.strip().lower() for s in req.stats_negativas]
+    todas_stats = stats_positivas + stats_negativas
     if not todas_stats:
         raise HTTPException(status_code=400, detail="No se enviaron stats.")
 
@@ -167,18 +169,27 @@ def calcular_ranking(req: RankingRequest):
 
     df = df.reset_index(drop=True)
 
-    stats_validas_pos = [s for s in req.stats_positivas if s in df.columns]
-    stats_validas_neg = [s for s in req.stats_negativas  if s in df.columns]
+    stats_validas_pos = [s for s in stats_positivas if s in df.columns]
+    stats_validas_neg = [s for s in stats_negativas if s in df.columns]
+
+    for s in stats_validas_pos + stats_validas_neg:
+        df[s] = pd.to_numeric(df[s], errors="coerce")
+
+    stats_validas_pos = [s for s in stats_validas_pos if df[s].notna().any()]
+    stats_validas_neg = [s for s in stats_validas_neg if df[s].notna().any()]
     todas_validas     = stats_validas_pos + stats_validas_neg
+
+    if not todas_validas:
+        raise HTTPException(status_code=400, detail="No hay stats numericas validas para calcular el ranking.")
 
     columnas_puntaje = []
     for s in stats_validas_pos:
         col = f"puntaje_{s}"
-        df[col] = df[s].rank(pct=True)
+        df[col] = df[s].rank(pct=True).fillna(0)
         columnas_puntaje.append(col)
     for s in stats_validas_neg:
         col = f"puntaje_{s}"
-        df[col] = 1.0 - df[s].rank(pct=True)
+        df[col] = (1.0 - df[s].rank(pct=True)).fillna(0)
         columnas_puntaje.append(col)
 
     if columnas_puntaje:
@@ -195,8 +206,12 @@ def calcular_ranking(req: RankingRequest):
         nombre   = str(row.get("jugador", ""))
         posicion = str(row.get(col_pos, "") if col_pos else "")
         minutos  = float(row[col_min]) if col_min and not pd.isna(row.get(col_min)) else None
-        stats    = {s: round(float(row[s]), 2) for s in todas_validas}
-        puntaje  = round(float(row["PUNTAJE_GLOBAL"]), 1)
+        stats    = {
+            s: (0.0 if pd.isna(row[s]) else round(float(row[s]), 2))
+            for s in todas_validas
+        }
+        puntaje_raw = row["PUNTAJE_GLOBAL"]
+        puntaje  = 0.0 if pd.isna(puntaje_raw) else round(float(puntaje_raw), 1)
 
         resultados.append(ResultadoRanking(
             jugador  = nombre,
