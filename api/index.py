@@ -80,8 +80,8 @@ def calcular_similitud(req: SimilitudRequest):
         df_pool = filtrar_por_posicion(df_pool, req.posicion)
 
     if req.pct_min is not None:
-        query_min = req.query.get("minutos")
-        if query_min is not None:
+        query_min = pd.to_numeric(req.query.get("minutos"), errors="coerce")
+        if not pd.isna(query_min):
             query_row = pd.Series({"minutos": float(query_min)})
             df_pool, _ = filtrar_minutos(df_pool, query_row, req.pct_min)
 
